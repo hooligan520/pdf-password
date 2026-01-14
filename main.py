@@ -148,60 +148,12 @@ def prioritize_passwords(passwords):
     
     return sorted_passwords
 
-def crack_pdf_password_high_performance(input_file, dictionary_folder, max_workers=8):
+def crack_pdf_password_simple(input_file, dictionary_folder, max_workers=1):
     """
-    高性能密码破解：使用多线程但保持单密码尝试的高效率
+    简单高效的密码破解：单线程+优先级排序，避免不必要的复杂性
     """
-    cracker = PDFPasswordCracker(input_file)
-    
-    # 收集所有密码
-    all_passwords = []
-    for root, _, files in os.walk(dictionary_folder):
-        for file in files:
-            dictionary_file = os.path.join(root, file)
-            with open(dictionary_file, 'r', encoding='utf-8', errors='ignore') as dict_file:
-                passwords = [p.strip() for p in dict_file.readlines() if p.strip()]
-                all_passwords.extend(passwords)
-    
-    if not all_passwords:
-        print("字典中没有找到有效密码")
-        return None
-    
-    print(f"总共找到 {len(all_passwords)} 个密码，使用 {max_workers} 个线程进行破解...")
-    
-    # 应用密码优先级排序
-    prioritized_passwords = prioritize_passwords(all_passwords)
-    
-    # 使用线程池并行尝试密码（单密码模式）
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有密码尝试任务（按优先级顺序）
-        future_to_password = {
-            executor.submit(cracker.try_password, password): password 
-            for password in prioritized_passwords
-        }
-        
-        # 使用进度条显示进度
-        with tqdm(total=len(prioritized_passwords), desc='正在尝试密码') as pbar:
-            for future in as_completed(future_to_password):
-                result = future.result()
-                if result:
-                    # 找到密码，取消其他任务
-                    executor.shutdown(wait=False)
-                    elapsed_time = time.time() - cracker.start_time
-                    print(f"\\n找到密码：{result} (耗时: {elapsed_time:.2f}秒)")
-                    print(f"密码在优先级列表中的位置：{prioritized_passwords.index(result) + 1}/{len(prioritized_passwords)}")
-                    return result
-                pbar.update(1)
-    
-    elapsed_time = time.time() - cracker.start_time
-    print(f"密码破解完成，未找到有效密码 (总耗时: {elapsed_time:.2f}秒)")
-    return None
-
-def crack_pdf_password_ultra_performance(input_file, dictionary_folder, max_workers=8, batch_size=100):
-    """
-    超高性能密码破解：使用线程池和批量密码验证
-    """
-    cracker = PDFPasswordCracker(input_file)
+    print(f"使用简单高效模式破解密码...")
+    start_time = time.time()
     
     # 收集所有密码
     all_passwords = []
@@ -217,44 +169,115 @@ def crack_pdf_password_ultra_performance(input_file, dictionary_folder, max_work
         print("字典中没有找到有效密码")
         return None
     
-    print(f"总共找到 {len(all_passwords)} 个密码，使用 {max_workers} 个线程进行破解...")
-    print(f"使用批量处理模式，每批 {batch_size} 个密码")
+    print(f"总共找到 {len(all_passwords)} 个密码")
     
     # 应用密码优先级排序
     prioritized_passwords = prioritize_passwords(all_passwords)
     
-    # 将密码分批处理
-    password_batches = [prioritized_passwords[i:i + batch_size] 
-                       for i in range(0, len(prioritized_passwords), batch_size)]
+    # 单线程顺序尝试（最简单最高效）
+    tried_count = 0
+    for password in tqdm(prioritized_passwords, desc='正在尝试密码'):
+        try:
+            with pikepdf.open(input_file, password=password) as pdf:
+                elapsed_time = time.time() - start_time
+                print(f"\n✅ 找到密码：{password}")
+                print(f"📊 性能统计：")
+                print(f"   - 耗时：{elapsed_time:.2f}秒")
+                print(f"   - 已尝试：{tried_count + 1}/{len(prioritized_passwords)} 个密码")
+                print(f"   - 速度：{(tried_count + 1) / elapsed_time:.2f} 密码/秒")
+                print(f"   - 密码优先级位置：{prioritized_passwords.index(password) + 1}")
+                return password
+        except (pikepdf.PasswordError, pikepdf.PdfError):
+            tried_count += 1
+            continue
     
-    print(f"总共分成 {len(password_batches)} 个批次进行验证")
-    
-    # 使用线程池（避免进程池的序列化问题）
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有批次任务
-        future_to_batch = {
-            executor.submit(cracker.try_password_batch, batch): batch_idx 
-            for batch_idx, batch in enumerate(password_batches)
-        }
-        
-        # 使用进度条显示进度
-        with tqdm(total=len(password_batches), desc='正在批量验证密码') as pbar:
-            for future in as_completed(future_to_batch):
-                result = future.result()
-                if result:
-                    # 找到密码，取消其他任务
-                    for f in future_to_batch:
-                        f.cancel()
-                    elapsed_time = time.time() - cracker.start_time
-                    passwords_tried = (future_to_batch[future] + 1) * batch_size
-                    print(f"\n找到密码：{result} (耗时: {elapsed_time:.2f}秒)")
-                    print(f"已尝试密码数：{passwords_tried}/{len(prioritized_passwords)}")
-                    return result
-                pbar.update(1)
-    
-    elapsed_time = time.time() - cracker.start_time
-    print(f"密码破解完成，未找到有效密码 (总耗时: {elapsed_time:.2f}秒)")
+    elapsed_time = time.time() - start_time
+    print(f"\n❌ 未找到有效密码")
+    print(f"📊 性能统计：")
+    print(f"   - 总耗时：{elapsed_time:.2f}秒")
+    print(f"   - 总尝试：{len(prioritized_passwords)} 个密码")
+    print(f"   - 平均速度：{len(prioritized_passwords) / elapsed_time:.2f} 密码/秒")
     return None
+
+def crack_pdf_password_optimized(input_file, dictionary_folder, max_workers=4):
+    """
+    优化版密码破解：轻量级多线程，避免过度工程化
+    """
+    print(f"使用优化模式破解密码（{max_workers}线程）...")
+    start_time = time.time()
+    found_password = None
+    lock = threading.Lock()
+    
+    # 收集所有密码
+    all_passwords = []
+    for root, _, files in os.walk(dictionary_folder):
+        for file in files:
+            if file.endswith('.txt'):
+                dictionary_file = os.path.join(root, file)
+                with open(dictionary_file, 'r', encoding='utf-8', errors='ignore') as dict_file:
+                    passwords = [p.strip() for p in dict_file.readlines() if p.strip()]
+                    all_passwords.extend(passwords)
+    
+    if not all_passwords:
+        print("字典中没有找到有效密码")
+        return None
+    
+    print(f"总共找到 {len(all_passwords)} 个密码")
+    
+    # 应用密码优先级排序
+    prioritized_passwords = prioritize_passwords(all_passwords)
+    
+    def try_password_thread(password):
+        nonlocal found_password
+        if found_password:
+            return None
+            
+        try:
+            with pikepdf.open(input_file, password=password) as pdf:
+                with lock:
+                    if not found_password:
+                        found_password = password
+                        return password
+        except (pikepdf.PasswordError, pikepdf.PdfError):
+            return None
+        return None
+    
+    # 简单的多线程实现
+    threads = []
+    password_index = 0
+    
+    with tqdm(total=len(prioritized_passwords), desc='正在尝试密码') as pbar:
+        while password_index < len(prioritized_passwords) and not found_password:
+            # 创建线程（不超过最大线程数）
+            active_threads = [t for t in threads if t.is_alive()]
+            if len(active_threads) < max_workers:
+                password = prioritized_passwords[password_index]
+                thread = threading.Thread(target=try_password_thread, args=(password,))
+                thread.start()
+                threads.append(thread)
+                password_index += 1
+                pbar.update(1)
+            else:
+                time.sleep(0.01)  # 短暂等待
+        
+        # 等待所有线程完成
+        for thread in threads:
+            thread.join()
+    
+    elapsed_time = time.time() - start_time
+    if found_password:
+        print(f"\n✅ 找到密码：{found_password}")
+        print(f"📊 性能统计：")
+        print(f"   - 耗时：{elapsed_time:.2f}秒")
+        print(f"   - 速度：{password_index / elapsed_time:.2f} 密码/秒")
+    else:
+        print(f"\n❌ 未找到有效密码")
+        print(f"📊 性能统计：")
+        print(f"   - 总耗时：{elapsed_time:.2f}秒")
+        print(f"   - 总尝试：{len(prioritized_passwords)} 个密码")
+        print(f"   - 平均速度：{len(prioritized_passwords) / elapsed_time:.2f} 密码/秒")
+    
+    return found_password
 
 def remove_pdf_password_high_performance(input_file, output_file, dictionary_folder, password=None, max_workers=8):
     """
@@ -373,6 +396,65 @@ def set_encrypt_pdf(input_file, output_file, password):
     except Exception as e:
         print(f"发生错误：{e}")
 
+def remove_pdf_password_optimized(input_file, output_file, dictionary_folder, password=None, max_workers=1, mode='simple'):
+    """
+    优化版PDF密码移除函数
+    """
+    try:
+        # 首先尝试使用传入的密码
+        if password:
+            print(f"尝试使用提供的密码进行解密...")
+            start_time = time.time()
+            try:
+                with pikepdf.open(input_file, password=password) as pdf:
+                    pdf.save(output_file)
+                    elapsed_time = time.time() - start_time
+                    print(f"✅ 使用提供的密码解密成功 (耗时: {elapsed_time:.2f}秒)")
+                    return
+            except (pikepdf.PasswordError, pikepdf.PdfError):
+                print("❌ 提供的密码不正确")
+        
+        # 尝试空密码
+        print("尝试使用空密码进行解密...")
+        start_time = time.time()
+        try:
+            with pikepdf.open(input_file, password='') as pdf:
+                pdf.save(output_file)
+                elapsed_time = time.time() - start_time
+                print(f"✅ 使用空密码解密成功 (耗时: {elapsed_time:.2f}秒)")
+                return
+        except (pikepdf.PasswordError, pikepdf.PdfError):
+            print("❌ 空密码解密失败")
+        
+        # 根据模式选择破解方法
+        if mode == 'simple':
+            print("🔹 使用简单高效模式（单线程+优先级排序）")
+            found_password = crack_pdf_password_simple(input_file, dictionary_folder, max_workers)
+        elif mode == 'optimized':
+            print("🔸 使用优化模式（轻量级多线程）")
+            found_password = crack_pdf_password_optimized(input_file, dictionary_folder, max_workers)
+        else:
+            print("🔹 默认使用简单高效模式")
+            found_password = crack_pdf_password_simple(input_file, dictionary_folder, max_workers)
+        
+        if found_password:
+            try:
+                with pikepdf.open(input_file, password=found_password) as pdf:
+                    pdf.save(output_file)
+                    print(f"✅ 使用字典找到的密码 '{found_password}' 解密成功")
+            except (pikepdf.PasswordError, pikepdf.PdfError):
+                print(f"❌ 字典密码 '{found_password}' 解密失败")
+                raise Exception("文件解密失败")
+        else:
+            print("❌ 未找到有效密码")
+            raise Exception("未找到有效密码")
+            
+        print(f"✅ 解密成功，已生成新文件：{output_file}")
+
+    except Exception as e:
+        print(f"❌ 发生错误：{e}")
+        raise
+
 if __name__ == '__main__':
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description='PDF文件加密与解密工具')
@@ -381,24 +463,18 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', required=True, help='输出PDF文件路径')
     parser.add_argument('-p', '--password', help='密码（加密时必需，解密时可选）')
     parser.add_argument('-d', '--dictionary', default='./password_brute_dictionary', help='密码字典文件夹路径（解密时使用）')
-    parser.add_argument('-t', '--threads', type=int, default=8, help='解密时使用的线程数（默认8个，macOS推荐）')
-    parser.add_argument('-b', '--batch-size', type=int, default=100, help='批量密码验证的大小（默认100个/批）')
-    parser.add_argument('--ultra-mode', action='store_true', help='启用超高性能模式（使用进程池）')
+    parser.add_argument('-t', '--threads', type=int, default=1, help='解密时使用的线程数（默认1个，简单模式推荐）')
+    parser.add_argument('-m', '--mode', choices=['simple', 'optimized'], default='simple', help='破解模式：simple(简单高效) 或 optimized(优化多线程)')
     
     args = parser.parse_args()
     
     if args.action == 'encrypt':
         if not args.password:
-            print("错误：加密操作需要指定密码，请使用 -p 参数")
+            print("❌ 错误：加密操作需要指定密码，请使用 -p 参数")
             exit(1)
-        print(f"正在加密文件：{args.input} -> {args.output}")
+        print(f"🔒 正在加密文件：{args.input} -> {args.output}")
         set_encrypt_pdf(args.input, args.output, args.password)
     
     elif args.action == 'decrypt':
-        print(f"正在解密文件：{args.input} -> {args.output}")
-        if args.ultra_mode:
-            print("启用超高性能模式（进程池+批量验证）")
-            remove_pdf_password_ultra_performance(args.input, args.output, args.dictionary, args.password, args.threads, args.batch_size)
-        else:
-            print("使用高性能模式（多线程+优先级排序）")
-            remove_pdf_password_high_performance(args.input, args.output, args.dictionary, args.password, args.threads)
+        print(f"🔓 正在解密文件：{args.input} -> {args.output}")
+        remove_pdf_password_optimized(args.input, args.output, args.dictionary, args.password, args.threads, args.mode)
