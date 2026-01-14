@@ -1,5 +1,9 @@
 '''
 Description: PDF 文件的加密与去密
+Version: 1.0
+Author: Glenn
+Email: chenluda01@outlook.com
+Date: 2023-05-15 14:07:20
 Copyright (c) 2023 by Kust-BME, All Rights Reserved. 
 '''
 import PyPDF2
