@@ -1,0 +1,10 @@
+# PDF Password Tool 依赖库
+# 安装命令: pip install -r requirements.txt
+
+PyPDF2>=3.0.0
+pikepdf>=8.0.0
+tqdm>=4.60.0
+
+# 可选依赖（用于增强功能）
+# reportlab>=3.6.0  # 用于PDF生成（如果需要创建PDF文件）
+# fpdf2>=2.7.0      # 替代的PDF生成库
