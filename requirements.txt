@@ -1,7 +1,6 @@
 # PDF Password Tool 依赖库
 # 安装命令: pip install -r requirements.txt
 
-PyPDF2>=3.0.0
 pikepdf>=8.0.0
 tqdm>=4.60.0
 
