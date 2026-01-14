@@ -5,9 +5,87 @@ PDF密码破解性能测试脚本
 """
 
 import time
+import os
 import subprocess
 import sys
-import os
+
+def test_current_performance():
+    """测试当前代码的性能基准"""
+    print("🔍 开始性能基准测试...")
+    
+    # 准备测试文件
+    test_pdf = "test_encrypted.pdf"
+    output_pdf = "test_decrypted.pdf"
+    dictionary_folder = "./password_brute_dictionary"
+    
+    # 确保测试文件存在
+    if not os.path.exists(test_pdf):
+        print("❌ 测试文件不存在，请先创建加密的测试PDF文件")
+        return
+    
+    # 测试简单模式
+    print("\n📊 测试简单模式性能...")
+    start_time = time.time()
+    try:
+        result = subprocess.run([
+            sys.executable, "main.py", "decrypt", 
+            "-i", test_pdf, 
+            "-o", output_pdf,
+            "-d", dictionary_folder,
+            "-t", "1",
+            "-m", "simple"
+        ], capture_output=True, text=True, timeout=60)
+        
+        elapsed_time = time.time() - start_time
+        print(f"简单模式耗时: {elapsed_time:.2f}秒")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
+            
+    except subprocess.TimeoutExpired:
+        print("❌ 简单模式测试超时")
+    
+    # 测试优化模式
+    print("\n📊 测试优化模式性能...")
+    start_time = time.time()
+    try:
+        result = subprocess.run([
+            sys.executable, "main.py", "decrypt", 
+            "-i", test_pdf, 
+            "-o", output_pdf,
+            "-d", dictionary_folder,
+            "-t", "4",
+            "-m", "optimized"
+        ], capture_output=True, text=True, timeout=60)
+        
+        elapsed_time = time.time() - start_time
+        print(f"优化模式耗时: {elapsed_time:.2f}秒")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
+            
+    except subprocess.TimeoutExpired:
+        print("❌ 优化模式测试超时")
+
+def create_test_file():
+    """创建测试用的加密PDF文件"""
+    print("📝 创建测试文件...")
+    
+    # 创建一个简单的PDF文件并加密
+    import pikepdf
+    
+    # 创建一个简单的PDF
+    pdf = pikepdf.Pdf.new()
+    page = pikepdf.Page(pdf)
+    pdf.pages.append(page)
+    
+    # 保存未加密版本
+    pdf.save("test_unencrypted.pdf")
+    
+    # 加密版本
+    pdf.save("test_encrypted.pdf", encryption=pikepdf.Encryption(user="123456", owner="123456"))
+    
+    print("✅ 测试文件创建完成")
 
 def run_performance_test(test_name, command_args):
     """运行性能测试并返回结果"""
@@ -140,5 +218,10 @@ def main():
             print(f"📊 与Advanced PDF Password Recovery的差距: {gap_ratio:.1f} 倍")
             print(f"💡 建议: 我们的脚本性能仍有提升空间，但已显著改善")
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    # 首先创建测试文件
+    if not os.path.exists("test_encrypted.pdf"):
+        create_test_file()
+    
+    # 然后测试性能
+    test_current_performance()
