@@ -14,7 +14,13 @@
 ## 安装依赖
 
 ```bash
-pip install pikepdf
+pip install pikepdf pyhanko
+```
+
+或者使用 requirements.txt：
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## 命令行参数
@@ -29,9 +35,9 @@ python main.py <action> -i <input_file> -o <output_file> [options]
 
 | 参数 | 缩写 | 必需 | 说明 |
 |------|------|------|------|
-| `action` | - | 是 | 操作类型：`encrypt`（加密）或 `decrypt`（解密） |
+| `action` | - | 是 | 操作类型：`encrypt`（加密）、`decrypt`（解密）或 `hash`（提取hash） |
 | `-i, --input` | `-i` | 是 | 输入PDF文件路径 |
-| `-o, --output` | `-o` | 是 | 输出PDF文件路径 |
+| `-o, --output` | `-o` | encrypt/decrypt时必需 | 输出PDF文件路径（hash操作不需要） |
 | `-p, --password` | `-p` | 加密时必需 | 密码（加密时必需，解密时可选） |
 | `-d, --dictionary` | `-d` | 否 | 密码字典文件夹路径（默认：`./password_brute_dictionary`） |
 | `-t, --threads` | `-t` | 否 | 进程数（默认8，仅优化版本有效） |
@@ -74,6 +80,26 @@ python main.py decrypt -i ./test/encrypted.pdf -o ./test/decrypted.pdf -d ./pass
 python main.py decrypt -i ./test/encrypted.pdf -o ./test/decrypted.pdf
 ```
 
+### 5. 提取PDF Hash值（用于Hashcat/John the Ripper）
+
+```bash
+# 提取PDF的hash值，输出为John the Ripper / Hashcat格式
+python main.py hash -i ./test/encrypted.pdf
+
+# 输出示例：
+# $pdf$2*3*40*0*1*16*0123456789abcdef*32*...*32*...
+```
+
+**使用提取的hash进行破解：**
+
+```bash
+# Hashcat (macOS需要安装hashcat)
+hashcat -m 10500 hash.txt wordlist.txt
+
+# John the Ripper
+john --format=PDF hash.txt
+```
+
 ## 解密流程说明
 
 解密操作会按照以下顺序尝试：
@@ -104,6 +130,7 @@ PDF文件支持两种密码类型：
 ### 依赖库
 
 - **pikepdf**：用于PDF文件的读写、加密解密和密码破解操作
+- **pyhanko**：用于提取PDF hash值（Hashcat/John the Ripper格式）
 
 ## 版本说明
 
