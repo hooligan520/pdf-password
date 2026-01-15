@@ -400,8 +400,9 @@ def remove_pdf_password_optimized(input_file, output_file, dictionary_folder, pa
             print(f"❌ 使用找到的密码解密失败: {e}")
             raise
     else:
-        print("❌ 未找到有效密码")
-        raise Exception("未找到有效密码")
+        # crack_pdf_password_optimized 已经打印了"未找到有效密码"和性能数据
+        # 这里直接返回，不抛出异常，避免显示 Traceback
+        return
 
 
 def remove_pdf_password(input_file, output_file, dictionary_folder, password=None, num_processes=8, batch_size=50, use_optimized=True):
@@ -446,8 +447,9 @@ def remove_pdf_password(input_file, output_file, dictionary_folder, password=Non
         print(f"✅ 使用找到的密码解密成功")
         print(f"✅ 解密成功：{output_file}")
     else:
-        print("❌ 未找到有效密码")
-        raise Exception("未找到有效密码")
+        # crack_pdf_password 已经打印了"未找到有效密码"和性能数据
+        # 这里直接返回，不抛出异常，避免显示 Traceback
+        return
 
 def set_encrypt_pdf(input_file, output_file, password):
     """
@@ -480,6 +482,7 @@ if __name__ == '__main__':
     elif args.action == 'decrypt':
         print(f"🔓 解密：{args.input} -> {args.output}")
         use_optimized = not args.no_optimized
+        
         if use_optimized:
             print(f"🚀 使用优化版本（{args.threads}进程，批次大小{args.batch_size}）")
         else:
